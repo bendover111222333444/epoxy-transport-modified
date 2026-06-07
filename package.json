@@ -1,6 +1,6 @@
 {
 	"name": "@bendover111222333444/epoxy-transport",
-	"version": "3.0.2",
+	"version": "3.0.5",
 	"description": "a bare transport that implements end-to-end encryption with epoxy-tls and wisp modified by bendover111222333444",
 	"main": "./dist/index.mjs",
 	"keywords": [],

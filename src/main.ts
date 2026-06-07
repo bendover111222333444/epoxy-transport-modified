@@ -78,41 +78,53 @@ export default class EpoxyTransport implements ProxyTransport {
 	): Promise<TransferrableResponse> {
 		if (body instanceof Blob) body = await body.arrayBuffer();
 
-		try {
-			let headersObj: Record<string, string> = {};
-			for (let [key, value] of headers) {
-				if (headersObj[key]) {
-					// epoxy does not support multiple headers with the same key
-					console.warn(
-						`Duplicate header key "${key}" detected. Overwriting previous value.`
-					);
-				}
-				headersObj[key] = value;
-			}
-
-			let res = await this.client.fetch(remote.href, {
-				method,
-				body,
-				headers: headersObj,
-				redirect: "manual",
-			});
-			let headersEntries: RawHeaders = [];
-			for (let [key, value] of Object.entries((res as any).rawHeaders) as any) {
-				if (Array.isArray(value)) {
-					for (let v of value) {
-						headersEntries.push([key, v]);
+		const doRequest = async () => {
+			try {
+				let headersObj: Record<string, string> = {};
+				for (let [key, value] of headers) {
+					if (headersObj[key]) {
+						console.warn(
+							`Duplicate header key "${key}" detected. Overwriting previous value.`
+						);
 					}
-				} else {
-					headersEntries.push([key, value]);
+					headersObj[key] = value;
 				}
+
+				let res = await this.client.fetch(remote.href, {
+					method,
+					body,
+					headers: headersObj,
+					redirect: "manual",
+				});
+				let headersEntries: RawHeaders = [];
+				for (let [key, value] of Object.entries((res as any).rawHeaders) as any) {
+					if (Array.isArray(value)) {
+						for (let v of value) {
+							headersEntries.push([key, v]);
+						}
+					} else {
+						headersEntries.push([key, value]);
+					}
+				}
+				return {
+					body: res.body!,
+					headers: headersEntries,
+					status: res.status,
+					statusText: res.statusText,
+				};
+			} catch (err) {
+				throw err;
 			}
-			return {
-				body: res.body!,
-				headers: headersEntries,
-				status: res.status,
-				statusText: res.statusText,
-			};
+		};
+
+		try {
+			return await doRequest();
 		} catch (err) {
+			const msg = String(err);
+			if (msg.includes("tls handshake eof") || msg.includes("MuxTaskEnded") || msg.includes("UnexpectedEof")) {
+				await this.init();
+				return await doRequest();
+			}
 			console.error(err);
 			throw err;
 		}
